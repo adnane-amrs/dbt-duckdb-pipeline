@@ -1,0 +1,49 @@
+models:
+  - name: job_posting
+    description: >
+      Cleaned job postings: core posting fields from all monthly scrapes, with
+      failed scrapes (error IS NOT NULL) removed. One row per scrape, so the same
+      job_id can appear more than once.
+    config: 
+      persist_docs:
+        relation: true
+        columns: true
+    columns:
+      - name: job_id
+        description: The scraper's posting id. Not unique (a posting can be scraped on several days) and occasionally null.
+      - name: job_title
+        description: Job title as written in the posting.
+        data_tests:
+          - not_null
+      - name: company_name
+        description: Name of the hiring company.
+        data_tests:
+          - not_null
+      - name: job_location
+        description: Location as written in the posting (city, state, country, or "Anywhere").
+      - name: job_via
+        description: Job board or site the posting was found on (e.g. LinkedIn, Snagajob, BeBee).
+      - name: job_schedule_type
+        description: Employment type, e.g. Full-time, Contractor, Part-time, Internship, or a combination. Null when not stated.
+      - name: job_work_from_home
+        description: True when the posting is marked as remote; null otherwise.
+      - name: search_date
+        description: Date the posting was scraped.
+        data_tests:
+          - not_null
+      - name: search_term
+        description: Search query that returned the posting; the role the posting is grouped under.
+        
+  - name: jobs_per_month
+    description: Monthly posting counts by role.
+    config: 
+      persist_docs:
+        relation: true
+        columns: true
+    columns:
+      - name: month
+        description: Posting month, truncated from search_date.
+      - name: role
+        description: Search Role (search_term)
+      - name: postings
+        description: Postings counted for the role that month. 
