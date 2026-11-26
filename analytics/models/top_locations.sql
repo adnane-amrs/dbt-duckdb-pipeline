@@ -4,4 +4,4 @@ SELECT
 FROM {{ ref('job_posting') }}
 GROUP BY job_location 
 ORDER BY postings DESC
-LIMIT 10;
+LIMIT 10
