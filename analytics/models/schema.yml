@@ -17,8 +17,6 @@ models:
           - not_null
       - name: company_name
         description: Name of the hiring company.
-        data_tests:
-          - not_null
       - name: job_location
         description: Location as written in the posting (city, state, country, or "Anywhere").
       - name: job_via

@@ -1,4 +1,4 @@
-{{ config(materialized='ephemeral') }}
+{{ config(materialized='view') }}
 
 SELECT 
     job_id,
@@ -11,4 +11,4 @@ SELECT
     search_date,
     search_term
 FROM {{source('raw', 'job_postings')}}
-WHERE error IS NULL
+WHERE error IS NULL 
