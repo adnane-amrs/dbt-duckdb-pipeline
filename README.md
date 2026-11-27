@@ -5,6 +5,7 @@
 A dbt + DuckDB pipeline over ~692k real job postings, rebuilt and published automatically by GitHub Actions.
 
 - Turns 12 months of raw Parquet scrapes into tested, documented analytics tables
+- Publishes a [live dbt docs site](https://adnane-amrs.github.io/dbt-duckdb-pipeline/) with lineage, descriptions and tests
 - Publishes the finished warehouse as a GitHub Release that anyone can query with one `ATTACH`, no credentials needed
 - Runs itself on GitHub Actions: on every push to `main`, every Monday, and on demand
 
@@ -13,7 +14,7 @@ A dbt + DuckDB pipeline over ~692k real job postings, rebuilt and published auto
 | **dbt pipeline** | Raw Parquet source → cleaned view → aggregate tables (monthly counts, top locations, remote share) | [`analytics/models/`](analytics/models/) |
 | **Source management** | Raw files declared once as a dbt source with `external_location`; models read them through `source()` and `ref()` | [`sources.yml`](analytics/models/sources.yml) |
 | **Data tests** | 24 tests: `not_null`, `unique`, `relationships`, `accepted_values`, and dbt_utils `unique_combination_of_columns`, `expression_is_true` and `accepted_range` | [`schema.yml`](analytics/models/schema.yml) |
-| **Documentation** | Model and column descriptions, also written into DuckDB as comments with `persist_docs`; lineage in dbt Docs | [Pipeline](#pipeline) |
+| **Hosted dbt docs** | Model and column descriptions, lineage graph and tests, published as a public docs site; descriptions also written into DuckDB as comments with `persist_docs` | [Live docs site](https://adnane-amrs.github.io/dbt-duckdb-pipeline/) |
 | **CI/CD** | GitHub Actions runs `dbt build` (models + tests) on every push, on a weekly schedule, and manually | [`dbt_build.yml`](.github/workflows/dbt_build.yml) |
 | **Environments** | Local `dev` target vs CI `prod` target, each with its own DuckDB file | [`ci/profiles.yml`](ci/profiles.yml) |
 | **Published warehouse** | CI uploads `prod.duckdb` to a GitHub Release; queryable remotely with one `ATTACH` | [Query it](#query-the-published-warehouse) |
@@ -95,6 +96,8 @@ One row per (job, skill) pair: `job_id`, `skill_keyword`, `skill_id`.
 
 ## Pipeline
 
+Explore the full lineage interactively on the [live dbt docs site](https://adnane-amrs.github.io/dbt-duckdb-pipeline/).
+
 Lineage graph from dbt Docs: the raw `job_postings` source feeds `job_posting`, which feeds the three downstream models. `monthly_summary` also reads from `jobs_per_month`.
 
 ![dbt lineage graph](docs/images/lineage.png)
@@ -169,7 +172,7 @@ dbt run      # build the models
 dbt build    # run models + tests + seeds
 ```
 
-To browse the docs and the lineage graph locally:
+The docs are hosted at **https://adnane-amrs.github.io/dbt-duckdb-pipeline/**. To browse them and the lineage graph locally instead:
 
 ```bash
 dbt docs generate
@@ -206,7 +209,7 @@ Query the three tables (`jobs_per_month`, `top_locations`, `monthly_summary`). T
 - [x] Add generic tests (built-in + dbt_utils)
 - [x] Generate dbt docs (`dbt docs generate`)
 - [x] Build, test and publish the warehouse with GitHub Actions
-- [ ] Publish the dbt docs site (e.g. GitHub Pages)
+- [x] Publish the dbt docs site on [GitHub Pages](https://adnane-amrs.github.io/dbt-duckdb-pipeline/)
 - [ ] Add a staging model for `raw_job_skills`
 - [ ] Build marts: top skills by role, remote share, postings over time
 
