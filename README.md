@@ -19,13 +19,20 @@ The dataset comes from Luke Barousse's [dbt Analytics Engineering Course](https:
 dbt-duckdb-project/
 ├── analytics/                  # dbt project
 │   ├── dbt_project.yml         # dbt project config (name: analytics)
+│   ├── packages.yml            # dbt packages (dbt_utils)
 │   ├── models/
-│   │   └── job_posting.sql     # Cleaned job postings view
+│   │   ├── sources.yml         # Raw Parquet source definition
+│   │   ├── schema.yml          # Model docs and tests
+│   │   ├── job_posting.sql     # Cleaned job postings view
+│   │   ├── jobs_per_month.sql
+│   │   ├── top_locations.sql
+│   │   └── monthly_summary.sql
 │   ├── macros/
 │   └── seeds/
 ├── data/                       # git-ignored
 │   ├── raw/                    # Raw Parquet files (downloaded)
 │   └── dev.duckdb              # DuckDB database built by dbt
+├── docs/images/                # Screenshots used in this README
 ├── scripts/
 │   └── download_data.py        # Downloads the raw dataset into data/raw/
 ├── src/dbt_duckdb_project/     # Python package scaffold
@@ -61,11 +68,26 @@ One row per scraped job posting. Main columns:
 
 One row per (job, skill) pair: `job_id`, `skill_keyword`, `skill_id`.
 
+## Pipeline
+
+Lineage graph from dbt Docs: the raw `job_postings` source feeds `job_posting`, which feeds the three downstream models. `monthly_summary` also reads from `jobs_per_month`.
+
+![dbt lineage graph](docs/images/lineage.png)
+
+`job_posting` with its upstream source, downstream models and the 8 data tests that run on it:
+
+![job_posting lineage with tests](docs/images/job_posting_lineage_tests.png)
+
 ## Models
 
 | Model | Materialization | Description |
 |-------|-----------------|-------------|
-| `job_posting` | view | Selects the core posting fields from all monthly files and drops rows with scrape errors (`WHERE error IS NULL`) |
+| `job_posting` | view | Core posting fields from the `raw.job_postings` source, with failed scrapes removed (`WHERE error IS NULL`) |
+| `jobs_per_month` | table | Posting counts per month and role (`search_term`) |
+| `top_locations` | table | Top 10 job locations by number of postings |
+| `monthly_summary` | table | One row per month: total postings, remote postings and remote share (%) |
+
+Models are documented and tested in [`schema.yml`](analytics/models/schema.yml), using dbt's built-in tests and [dbt_utils](https://github.com/dbt-labs/dbt-utils) (`unique_combination_of_columns`, `expression_is_true`, `accepted_range`).
 
 ## Getting started
 
@@ -116,9 +138,17 @@ analytics:
 
 ```bash
 cd analytics
+dbt deps     # install packages (dbt_utils)
 dbt debug    # check the connection
 dbt run      # build the models
 dbt build    # run models + tests + seeds
+```
+
+To browse the docs and the lineage graph locally:
+
+```bash
+dbt docs generate
+dbt docs serve   # opens http://127.0.0.1:8580
 ```
 
 ### 6. Query the results
@@ -132,11 +162,11 @@ duckdb ../data/dev.duckdb -c "SELECT search_term, COUNT(*) AS postings FROM main
 
 ## Roadmap
 
+- [x] Define sources in a `sources.yml` instead of hard-coded file paths
+- [x] Add generic tests (built-in + dbt_utils)
+- [x] Generate dbt docs (`dbt docs generate`)
 - [ ] Add a staging model for `raw_job_skills`
-- [ ] Define sources in a `sources.yml` instead of hard-coded file paths
-- [ ] Add schema tests (`unique`, `not_null`) on `job_id`
 - [ ] Build marts: top skills by role, remote share, postings over time
-- [ ] Generate dbt docs (`dbt docs generate`)
 
 ## Credits
 
