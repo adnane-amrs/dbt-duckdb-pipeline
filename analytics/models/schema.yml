@@ -4,10 +4,17 @@ models:
       Cleaned job postings: core posting fields from all monthly scrapes, with
       failed scrapes (error IS NOT NULL) removed. One row per scrape, so the same
       job_id can appear more than once.
-    config: 
+    config:
       persist_docs:
         relation: true
         columns: true
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [job_id, search_date]
+          config:
+            where: "job_id is not null"
+            severity: warn
     columns:
       - name: job_id
         description: The scraper's posting id. Not unique (a posting can be scraped on several days) and occasionally null.
@@ -17,6 +24,10 @@ models:
           - not_null
       - name: company_name
         description: Name of the hiring company.
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
       - name: job_location
         description: Location as written in the posting (city, state, country, or "Anywhere").
       - name: job_via
@@ -25,38 +36,96 @@ models:
         description: Employment type, e.g. Full-time, Contractor, Part-time, Internship, or a combination. Null when not stated.
       - name: job_work_from_home
         description: True when the posting is marked as remote; null otherwise.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [true]
+                quote: false
       - name: search_date
         description: Date the posting was scraped.
         data_tests:
           - not_null
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "<= current_date"
       - name: search_term
         description: Search query that returned the posting; the role the posting is grouped under.
-        
+        data_tests:
+          - not_null
+
   - name: jobs_per_month
     description: Monthly posting counts by role.
-    config: 
+    config:
       persist_docs:
         relation: true
         columns: true
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [month, role]
     columns:
       - name: month
         description: Posting month, truncated from search_date.
+        data_tests:
+          - not_null
       - name: role
         description: Search Role (search_term)
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('job_posting')
+                field: search_term
       - name: postings
-        description: Postings counted for the role that month. 
+        description: Postings counted for the role that month.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+
   - name: monthly_summary
     description: Monthly summary of job postings; one row per month.
     config:
       persist_docs:
         relation: true
         columns: true
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "remote_postings <= total_postings"
     columns:
       - name: month
         description: Year and month of the summary.
+        data_tests:
+          - unique
+          - not_null
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "= date_trunc('month', month)"
+          - relationships:
+              arguments:
+                to: ref('jobs_per_month')
+                field: month
       - name: total_postings
         description: All postings that month (summed from jobs_per_month).
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
       - name: remote_postings
         description: Postings flagged remote that month.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
       - name: pct_remote
         description: Share of the month's postings flagged remote, percent.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
