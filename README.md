@@ -1,4 +1,23 @@
-# dbt + DuckDB Job Postings Analytics
+# Automated Job Postings Pipeline (v1) dbt + DuckDB
+
+![dbt pipeline diagram](img/dbt_pipeline.png)
+
+A dbt + DuckDB pipeline over ~692k real job postings, rebuilt and published automatically by GitHub Actions.
+
+- Turns 12 months of raw Parquet scrapes into tested, documented analytics tables
+- Publishes the finished warehouse as a GitHub Release that anyone can query with one `ATTACH`, no credentials needed
+- Runs itself on GitHub Actions: on every push to `main`, every Monday, and on demand
+
+| What I built | How I implemented it | Where to look |
+|--------------|----------------------|---------------|
+| **dbt pipeline** | Raw Parquet source → cleaned view → aggregate tables (monthly counts, top locations, remote share) | [`analytics/models/`](analytics/models/) |
+| **Source management** | Raw files declared once as a dbt source with `external_location`; models read them through `source()` and `ref()` | [`sources.yml`](analytics/models/sources.yml) |
+| **Data tests** | 24 tests: `not_null`, `unique`, `relationships`, `accepted_values`, and dbt_utils `unique_combination_of_columns`, `expression_is_true` and `accepted_range` | [`schema.yml`](analytics/models/schema.yml) |
+| **Documentation** | Model and column descriptions, also written into DuckDB as comments with `persist_docs`; lineage in dbt Docs | [Pipeline](#pipeline) |
+| **CI/CD** | GitHub Actions runs `dbt build` (models + tests) on every push, on a weekly schedule, and manually | [`dbt_build.yml`](.github/workflows/dbt_build.yml) |
+| **Environments** | Local `dev` target vs CI `prod` target, each with its own DuckDB file | [`ci/profiles.yml`](ci/profiles.yml) |
+| **Published warehouse** | CI uploads `prod.duckdb` to a GitHub Release; queryable remotely with one `ATTACH` | [Query it](#query-the-published-warehouse) |
+| **Reproducible setup** | uv with a lockfile for Python, `package-lock.yml` for dbt packages, a script to download the raw data | [`pyproject.toml`](pyproject.toml), [`download_data.py`](scripts/download_data.py) |
 
 An analytics engineering project that turns raw job-posting data into analysis-ready models with **dbt** (Fusion engine, v2) and **DuckDB**. dbt reads the raw Parquet files straight from disk, so there is no database server to install or load data into.
 
@@ -11,12 +30,15 @@ The dataset comes from Luke Barousse's [dbt Analytics Engineering Course](https:
 | [dbt](https://docs.getdbt.com/) 2.x (Fusion engine) | SQL transformations, testing, documentation |
 | [DuckDB](https://duckdb.org/) | Embedded analytical database that queries Parquet directly |
 | [uv](https://docs.astral.sh/uv/) | Python environment and dependency management |
+| [GitHub Actions](https://docs.github.com/actions) | Scheduled build, test and publish |
 | Python 3.13 | Runtime for the download script |
 
 ## Project structure
 
 ```
 dbt-duckdb-project/
+├── .github/workflows/
+│   └── dbt_build.yml           # CI: build, test and publish the warehouse
 ├── analytics/                  # dbt project
 │   ├── dbt_project.yml         # dbt project config (name: analytics)
 │   ├── packages.yml            # dbt packages (dbt_utils)
@@ -29,10 +51,13 @@ dbt-duckdb-project/
 │   │   └── monthly_summary.sql
 │   ├── macros/
 │   └── seeds/
+├── ci/
+│   └── profiles.yml            # dbt profile used by CI (prod target)
 ├── data/                       # git-ignored
 │   ├── raw/                    # Raw Parquet files (downloaded)
 │   └── dev.duckdb              # DuckDB database built by dbt
 ├── docs/images/                # Screenshots used in this README
+├── img/                        # Pipeline diagram
 ├── scripts/
 │   └── download_data.py        # Downloads the raw dataset into data/raw/
 ├── src/dbt_duckdb_project/     # Python package scaffold
@@ -160,11 +185,28 @@ cd analytics
 duckdb ../data/dev.duckdb -c "SELECT search_term, COUNT(*) AS postings FROM main.job_posting GROUP BY 1 ORDER BY 2 DESC;"
 ```
 
+## Query the published warehouse
+
+Every CI run uploads the production warehouse to the [`warehouse` release](https://github.com/adnane-amrs/dbt-duckdb-pipeline/releases/tag/warehouse). You can query it from any DuckDB session, with nothing to download or configure:
+
+```sql
+ATTACH 'https://github.com/adnane-amrs/dbt-duckdb-pipeline/releases/download/warehouse/prod.duckdb' AS jobs (READ_ONLY);
+USE jobs;
+
+SELECT * FROM monthly_summary;
+SELECT * FROM top_locations;
+SELECT * FROM jobs_per_month WHERE role = 'Data Engineer';
+```
+
+Query the three tables (`jobs_per_month`, `top_locations`, `monthly_summary`). The `job_posting` view reads the raw Parquet files, which exist only on the machine that built the warehouse, so it can't be queried remotely.
+
 ## Roadmap
 
 - [x] Define sources in a `sources.yml` instead of hard-coded file paths
 - [x] Add generic tests (built-in + dbt_utils)
 - [x] Generate dbt docs (`dbt docs generate`)
+- [x] Build, test and publish the warehouse with GitHub Actions
+- [ ] Publish the dbt docs site (e.g. GitHub Pages)
 - [ ] Add a staging model for `raw_job_skills`
 - [ ] Build marts: top skills by role, remote share, postings over time
 
